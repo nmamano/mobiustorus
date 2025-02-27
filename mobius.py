@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.widgets import Slider
+import math
 
 # Custom rotation handler to link both views
 def on_mouse_move(event):
@@ -46,6 +47,12 @@ def on_button_release(event):
     if event.inaxes in [ax1, ax2]:
         event.inaxes._mouse_init = None
 
+# Function to find the greatest common divisor
+def gcd(a, b):
+    if b == 0:
+        return a
+    return gcd(b, a % b)
+
 # Function to update the plot when parameters change
 def update(val):
     k = int(k_slider.val)
@@ -66,8 +73,12 @@ def update(val):
     polygon_y = []
     face_colors = []
     
-    # Generate different colors for each face
-    colors = plt.cm.rainbow(np.linspace(0, 1, k))
+    # Calculate the greatest common divisor between k and twist_multiplier
+    # If twist_multiplier is 0, use k as the number of colors
+    num_colors = gcd(k, twist_multiplier) if twist_multiplier > 0 else k
+    
+    # Generate different colors for each face based on GCD
+    colors = plt.cm.rainbow(np.linspace(0, 1, num_colors))
 
     for i in range(k):
         x1, y1 = vertices_x[i], vertices_y[i]
@@ -76,7 +87,10 @@ def update(val):
         t = np.linspace(0, 1, points_per_side)
         polygon_x.extend(x1 + (x2 - x1) * t)
         polygon_y.extend(y1 + (y2 - y1) * t)
-        face_colors.extend([colors[i]] * points_per_side)
+        
+        # Assign color based on modulo of GCD
+        color_index = i % num_colors
+        face_colors.extend([colors[color_index]] * points_per_side)
 
     polygon_x = np.array(polygon_x)
     polygon_y = np.array(polygon_y)
@@ -122,7 +136,10 @@ def update(val):
         twist_text = ""
     else:
         twist_text = f" with {twist_multiplier} face{'s' if twist_multiplier > 1 else ''} twist"
-    fig.suptitle(f'Torus with {k}-sided cross-section{twist_text}\nClick and drag to rotate!', y=0.95)
+    
+    # Add GCD information to the title
+    gcd_text = f"\nGCD({k}, {twist_multiplier}) = {num_colors} colors" if twist_multiplier > 0 else f"\n{k} colors"
+    fig.suptitle(f'Torus with {k}-sided cross-section{twist_text}{gcd_text}\nClick and drag to rotate!', y=0.95)
     fig.canvas.draw_idle()
 
 def update_twist_slider(val):
@@ -133,8 +150,16 @@ def update_twist_slider(val):
         twist_slider.set_val(0)
     update(val)
 
+def reset(event):
+    k_slider.reset()
+    twist_slider.reset()
+
 # Create figure with two subplots and space for sliders
-fig = plt.figure(figsize=(20, 12))
+fig = plt.figure(figsize=(10, 6))  # Reduced from (20, 12) to (16, 9)
+
+# Adjust subplot positions to reduce white space
+plt.subplots_adjust(top=0.9, bottom=0.15)
+
 ax1 = fig.add_subplot(121, projection='3d')
 ax2 = fig.add_subplot(122, projection='3d')
 

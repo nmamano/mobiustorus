@@ -52,3 +52,5 @@ close enough. now the 2 are moving together as i wanted, but i'm not getting the
 the left torus is perfect as is.
 the right torus should be as if i was looking at the left torus from behind
 ```
+
+18. make the number of colors be the LARGEST COMMON DIVISOR between the number of faces and the number of twists
