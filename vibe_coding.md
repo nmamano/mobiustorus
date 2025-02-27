@@ -1,5 +1,7 @@
 Settings: Cursor editor with claude-3.5-sonnet
 
+This is only for the polygonal torus with twists. I may add more features in the future.
+
 1. write a python script that draws a 3d torus. make it interactive if possible
 
 2. can you make the torus more like a doughnut? make the cross section a circle
