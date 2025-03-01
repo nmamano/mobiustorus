@@ -697,6 +697,133 @@ def plot_tetrahedron(ax1, ax2, r):
     fig.suptitle('Tetrahedron\nClick and drag to rotate!', y=0.95)
     fig.canvas.draw_idle()
 
+def plot_thick_triangle(ax1, ax2, r):
+    # Generate a thick triangle
+    # - equilateral triangle with varying thickness
+    # - thickness is 0 at base and top vertex
+    # - thickness increases and decreases in between
+    
+    # Parameters for the triangle
+    size = r * 2.0  # Increased scale factor for the triangle size (was 1.5)
+    height = size * np.sqrt(3) / 2  # Height of equilateral triangle
+    
+    # Define the front face vertices of the triangle (centered at origin)
+    top_vertex = np.array([0, height * 2/3, 0])         # top vertex
+    bottom_left = np.array([-size/2, -height/3, 0])      # bottom left
+    bottom_right = np.array([size/2, -height/3, 0])      # bottom right
+    
+    # Function to calculate thickness at a given height
+    # We want thickness=0 at y=-height/3 (base) and y=height*2/3 (top)
+    # and maximum thickness in between
+    def thickness_at_height(y):
+        # Normalize y between 0 and 1 (0 at base, 1 at top)
+        y_norm = (y - (-height/3)) / (height)
+        
+        # Parabolic function that's 0 at y=0 and y=1
+        return 2.0 * r * y_norm * (1 - y_norm)  # Increased thickness multiplier (was 1.5)
+    
+    # Number of segments for the curved sides
+    n_segments = 30
+    
+    # Create points along the left and right edges with varying thickness
+    left_edge_front = []
+    left_edge_back = []
+    right_edge_front = []
+    right_edge_back = []
+    
+    # Generate points along the edges
+    t_values = np.linspace(0, 1, n_segments)
+    for t in t_values:
+        # Left edge (top to bottom-left)
+        left_point = top_vertex * (1-t) + bottom_left * t
+        
+        # Right edge (top to bottom-right)
+        right_point = top_vertex * (1-t) + bottom_right * t
+        
+        # Calculate thickness at this height
+        left_thick = thickness_at_height(left_point[1])
+        right_thick = thickness_at_height(right_point[1])
+        
+        # Add front and back points with appropriate thickness
+        left_edge_front.append(left_point + np.array([0, 0, left_thick/2]))
+        left_edge_back.append(left_point + np.array([0, 0, -left_thick/2]))
+        
+        right_edge_front.append(right_point + np.array([0, 0, right_thick/2]))
+        right_edge_back.append(right_point + np.array([0, 0, -right_thick/2]))
+    
+    # Create the faces
+    faces = []
+    face_colors = []
+    
+    # Front face - triangulate between the front edges
+    for i in range(n_segments - 1):
+        # Add triangles to fill the front face
+        faces.append([left_edge_front[i], right_edge_front[i], left_edge_front[i+1]])
+        faces.append([right_edge_front[i], right_edge_front[i+1], left_edge_front[i+1]])
+        face_colors.extend(['lightblue', 'lightblue'])
+    
+    # Back face - triangulate between the back edges
+    for i in range(n_segments - 1):
+        # Add triangles to fill the back face
+        faces.append([left_edge_back[i], left_edge_back[i+1], right_edge_back[i]])
+        faces.append([right_edge_back[i], left_edge_back[i+1], right_edge_back[i+1]])
+        face_colors.extend(['lightgreen', 'lightgreen'])
+    
+    # Left side face - connect left front and back edges
+    for i in range(n_segments - 1):
+        # Add quad (as two triangles) for each segment
+        faces.append([left_edge_front[i], left_edge_front[i+1], left_edge_back[i]])
+        faces.append([left_edge_back[i], left_edge_front[i+1], left_edge_back[i+1]])
+        face_colors.extend(['coral', 'coral'])
+    
+    # Right side face - connect right front and back edges
+    for i in range(n_segments - 1):
+        # Add quad (as two triangles) for each segment
+        faces.append([right_edge_front[i], right_edge_back[i], right_edge_front[i+1]])
+        faces.append([right_edge_back[i], right_edge_back[i+1], right_edge_front[i+1]])
+        face_colors.extend(['gold', 'gold'])
+    
+    # Plot on both axes
+    for ax in [ax1, ax2]:
+        # Clear any existing content
+        ax.clear()
+        
+        # Create a Poly3DCollection with the faces
+        collection = Poly3DCollection(
+            faces,
+            facecolors=face_colors,
+            linewidths=0.05,  # Reduced line width for less visible mesh (was 0.1)
+            edgecolors='black',  # Black edges
+            alpha=0.95  # Increased opacity (was 0.9)
+        )
+        
+        # Enable proper depth sorting
+        collection.set_sort_zpos(0)
+        
+        # Add the collection to the axis
+        ax.add_collection3d(collection)
+        
+        # Set up the axes
+        ax.set_axis_off()
+        ax.set_box_aspect([1,1,1])
+        
+        limit = size * 1.3  # Increased limit to accommodate larger shape (was 1.2)
+        ax.set_xlim(-limit, limit)
+        ax.set_ylim(-limit, limit)
+        ax.set_zlim(-limit, limit)
+    
+    # Set initial viewing angles
+    ax1.view_init(elev=20, azim=45)  # front view
+    ax2.view_init(elev=-20, azim=225)  # back view
+    
+    fig.suptitle('Thick Triangle\nClick and drag to rotate!', y=0.95)
+    
+    # Add a description of the faces
+    fig.text(0.5, 0.01, 'Front: blue, Back: green, Left side: coral, Right side: gold', 
+            ha='center', fontsize=9)
+    
+    fig.canvas.draw_idle()
+
 # Function to update the plot when parameters change
 def update(val):
     k = int(k_slider.val)
@@ -742,6 +869,10 @@ def update(val):
     
     elif selected_shape == 'Tetrahedron':
         plot_tetrahedron(ax1, ax2, r)
+        return
+    
+    elif selected_shape == 'Thick Triangle':
+        plot_thick_triangle(ax1, ax2, r)
         return
 
     plot_polygon_torus(ax1, ax2, R, r, k, twist_multiplier, points_per_side)
@@ -816,7 +947,7 @@ shape_selector_ax = plt.axes([0.02, 0.02, 0.20, 0.18])  # Increased height, move
 shape_selector = RadioButtons(
     shape_selector_ax, 
     ('Polygon Torus', 'Normal Torus', 'Double Torus', 'Pointy Torus', 
-     'Twisted Pointy Torus', 'Pointy Cylinder', 'Cube', 'Octahedron', 'Edged Ball', 'Tetrahedron'),
+     'Twisted Pointy Torus', 'Pointy Cylinder', 'Cube', 'Octahedron', 'Edged Ball', 'Tetrahedron', 'Thick Triangle'),
     active=0  # Default to Polygon Torus
 )
 
