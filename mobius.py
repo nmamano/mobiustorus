@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, RadioButtons
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 # Custom rotation handler to link both views
 def on_mouse_move(event):
@@ -556,6 +557,146 @@ def plot_octahedron(ax1, ax2, r):
     fig.suptitle('Octahedron\nClick and drag to rotate!', y=0.95)
     fig.canvas.draw_idle()
 
+def plot_edged_ball(ax1, ax2, r):
+    # Create a flattened sphere with two differently colored hemispheres
+    # Generate the sphere coordinates
+    u = np.linspace(0, 2 * np.pi, 50)
+    v = np.linspace(0, np.pi, 50)
+    
+    # Create the sphere with flattening at the poles
+    flattening_factor = 0.8  # Controls how flattened the sphere is (1.0 = perfect sphere)
+    
+    # Create separate arrays for upper and lower hemispheres
+    # Upper hemisphere (0 to pi/2)
+    v_upper = np.linspace(0, np.pi/2, 25)
+    x_upper = r * np.outer(np.cos(u), np.sin(v_upper))
+    y_upper = r * np.outer(np.sin(u), np.sin(v_upper))
+    z_upper = r * flattening_factor * np.outer(np.ones(np.size(u)), np.cos(v_upper))
+    
+    # Lower hemisphere (pi/2 to pi)
+    v_lower = np.linspace(np.pi/2, np.pi, 25)
+    x_lower = r * np.outer(np.cos(u), np.sin(v_lower))
+    y_lower = r * np.outer(np.sin(u), np.sin(v_lower))
+    z_lower = r * flattening_factor * np.outer(np.ones(np.size(u)), np.cos(v_lower))
+    
+    # Plot on both axes
+    for ax in [ax1, ax2]:
+        # Plot the upper hemisphere (z >= 0)
+        upper_hemisphere = ax.plot_surface(
+            x_upper, y_upper, z_upper, 
+            rstride=1, cstride=1, 
+            color='lightblue', alpha=0.9,
+            linewidth=0, edgecolor='none',
+            clip_on=False,
+            zorder=1
+        )
+        
+        # Plot the lower hemisphere (z < 0)
+        lower_hemisphere = ax.plot_surface(
+            x_lower, y_lower, z_lower,  # Lower hemisphere already has correct z values
+            rstride=1, cstride=1, 
+            color='lightgreen', alpha=0.9,
+            linewidth=0, edgecolor='none',
+            clip_on=False,
+            zorder=0
+        )
+        
+        ax.set_axis_off()
+        ax.set_box_aspect([1, 1, 1])
+        
+        limit = r * 1.5
+        ax.set_xlim(-limit, limit)
+        ax.set_ylim(-limit, limit)
+        ax.set_zlim(-limit, limit)
+    
+    # Set initial viewing angles
+    ax1.view_init(elev=20, azim=45)  # front view
+    ax2.view_init(elev=-20, azim=225)  # back view
+    
+    fig.suptitle('Edged Ball\nClick and drag to rotate!', y=0.95)
+    
+    # Add a text annotation explaining the colors
+    fig.text(0.5, 0.01, 'Upper hemisphere: lightblue, Lower hemisphere: lightgreen', 
+             ha='center', fontsize=9)
+    
+    fig.canvas.draw_idle()
+
+def plot_tetrahedron(ax1, ax2, r):
+    # Generate a tetrahedron (4-faced polyhedron)
+    # Define the vertices of the tetrahedron
+    size = r * 1.5  # Size of the tetrahedron
+    
+    # Define the vertices (regular tetrahedron)
+    vertices = np.array([
+        [1, 1, 1],              # top
+        [1, -1, -1],            # right
+        [-1, 1, -1],            # left
+        [-1, -1, 1]             # front
+    ]) * size / np.sqrt(3)      # Normalize to desired size
+    
+    # Define the faces of the tetrahedron (each face is a triangle)
+    faces = [
+        [vertices[0], vertices[1], vertices[2]],  # top-right-left
+        [vertices[0], vertices[2], vertices[3]],  # top-left-front
+        [vertices[0], vertices[3], vertices[1]],  # top-front-right
+        [vertices[1], vertices[3], vertices[2]]   # right-front-left (bottom)
+    ]
+    
+    # Define colors for each face - using more distinct colors
+    face_colors = ['#FF5555', '#55FF55', '#5555FF', '#FFFF55']  # Brighter red, green, blue, yellow
+    
+    # Plot on both axes
+    for ax in [ax1, ax2]:
+        # Clear any existing content
+        ax.clear()
+        
+        # Sort faces by depth for proper transparency rendering
+        # Calculate the centroid (average position) of each face
+        centroids = np.array([np.mean(face, axis=0) for face in faces])
+        
+        # Get the current view direction
+        view_direction = np.array([0, 0, -1])  # Default view looks along negative z-axis
+        
+        # Calculate the dot product to determine depth
+        depths = np.dot(centroids, view_direction)
+        
+        # Sort faces by depth (furthest first for proper transparency)
+        sorted_indices = np.argsort(depths)
+        sorted_faces = [faces[i] for i in sorted_indices]
+        sorted_colors = [face_colors[i] for i in sorted_indices]
+        
+        # Create a Poly3DCollection with transparency
+        collection = Poly3DCollection(
+            sorted_faces,
+            facecolors=sorted_colors,
+            linewidths=0,  # No edges
+            edgecolors='none',  # No edge colors
+            alpha=0.8  # Add transparency
+        )
+        
+        # Enable proper depth sorting
+        collection.set_sort_zpos(0)
+        
+        # Add the collection to the axis
+        ax.add_collection3d(collection)
+        
+        # Improve the 3D rendering
+        ax.set_axis_off()
+        ax.set_box_aspect([1,1,1])
+        
+        # Set wider limits to avoid clipping
+        limit = size * 1.8
+        ax.set_xlim(-limit, limit)
+        ax.set_ylim(-limit, limit)
+        ax.set_zlim(-limit, limit)
+    
+    # Set initial viewing angles
+    ax1.view_init(elev=20, azim=45)  # front view
+    ax2.view_init(elev=-20, azim=225)  # back view
+    
+    fig.suptitle('Tetrahedron\nClick and drag to rotate!', y=0.95)
+    fig.canvas.draw_idle()
+
 # Function to update the plot when parameters change
 def update(val):
     k = int(k_slider.val)
@@ -593,6 +734,14 @@ def update(val):
     
     elif selected_shape == 'Octahedron':
         plot_octahedron(ax1, ax2, r)
+        return
+    
+    elif selected_shape == 'Edged Ball':
+        plot_edged_ball(ax1, ax2, r)
+        return
+    
+    elif selected_shape == 'Tetrahedron':
+        plot_tetrahedron(ax1, ax2, r)
         return
 
     plot_polygon_torus(ax1, ax2, R, r, k, twist_multiplier, points_per_side)
@@ -667,7 +816,7 @@ shape_selector_ax = plt.axes([0.02, 0.02, 0.20, 0.18])  # Increased height, move
 shape_selector = RadioButtons(
     shape_selector_ax, 
     ('Polygon Torus', 'Normal Torus', 'Double Torus', 'Pointy Torus', 
-     'Twisted Pointy Torus', 'Pointy Cylinder', 'Cube', 'Octahedron'),
+     'Twisted Pointy Torus', 'Pointy Cylinder', 'Cube', 'Octahedron', 'Edged Ball', 'Tetrahedron'),
     active=0  # Default to Polygon Torus
 )
 
