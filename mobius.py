@@ -518,29 +518,42 @@ def plot_octahedron(ax1, ax2, r):
         [vertices[5], vertices[4], vertices[1]]   # bottom-back-right
     ]
     
-    # Define colors for each face
+    # Define colors for each face - using more distinct colors for better visibility
     face_colors = ['red', 'green', 'blue', 'yellow', 'orange', 'purple', 'cyan', 'magenta']
     
     # Plot on both axes
     for ax in [ax1, ax2]:
-        # Plot each face of the octahedron
-        for i, face in enumerate(faces):
-            face = np.array(face)
-            # Create x, y, z coordinates for the face
-            x = face[:, 0]
-            y = face[:, 1]
-            z = face[:, 2]
-            
-            # Create a triangular grid for the face
-            tri = np.array([[0, 1, 2]])
-            
-            # Plot the face as a triangular surface
-            ax.plot_trisurf(x, y, z, triangles=tri, color=face_colors[i], alpha=0.9)
-            
-            # Draw the edges of the face
-            for j in range(3):
-                ax.plot([x[j], x[(j+1)%3]], [y[j], y[(j+1)%3]], [z[j], z[(j+1)%3]], 
-                        color='black', linewidth=1.5)
+        # Clear any existing content
+        ax.clear()
+        
+        # Sort faces by depth for proper transparency rendering
+        # Calculate the centroid (average position) of each face
+        centroids = np.array([np.mean(face, axis=0) for face in faces])
+        
+        # Get the current view direction
+        view_direction = np.array([0, 0, -1])  # Default view looks along negative z-axis
+        
+        # Calculate the dot product to determine depth
+        depths = np.dot(centroids, view_direction)
+        
+        # Sort faces by depth (furthest first for proper transparency)
+        sorted_indices = np.argsort(depths)
+        sorted_faces = [faces[i] for i in sorted_indices]
+        sorted_colors = [face_colors[i] for i in sorted_indices]
+        
+        # Create a Poly3DCollection with transparency
+        collection = Poly3DCollection(
+            sorted_faces,
+            facecolors=sorted_colors,
+            linewidths=0,  # No edge lines
+            alpha=0.9  # Transparency
+        )
+        
+        # Enable proper depth sorting
+        collection.set_sort_zpos(0)
+        
+        # Add the collection to the axis
+        ax.add_collection3d(collection)
         
         ax.set_axis_off()
         ax.set_box_aspect([1,1,1])
@@ -704,7 +717,7 @@ def plot_thick_triangle(ax1, ax2, r):
     # - thickness increases and decreases in between
     
     # Parameters for the triangle
-    size = r * 2.0  # Increased scale factor for the triangle size (was 1.5)
+    size = r * 5  # Scale factor for the triangle size
     height = size * np.sqrt(3) / 2  # Height of equilateral triangle
     
     # Define the front face vertices of the triangle (centered at origin)
@@ -720,7 +733,7 @@ def plot_thick_triangle(ax1, ax2, r):
         y_norm = (y - (-height/3)) / (height)
         
         # Parabolic function that's 0 at y=0 and y=1
-        return 2.0 * r * y_norm * (1 - y_norm)  # Increased thickness multiplier (was 1.5)
+        return 5 * r * y_norm * (1 - y_norm)
     
     # Number of segments for the curved sides
     n_segments = 30
@@ -792,9 +805,9 @@ def plot_thick_triangle(ax1, ax2, r):
         collection = Poly3DCollection(
             faces,
             facecolors=face_colors,
-            linewidths=0.05,  # Reduced line width for less visible mesh (was 0.1)
-            edgecolors='black',  # Black edges
-            alpha=0.95  # Increased opacity (was 0.9)
+            linewidths=0.05,
+            edgecolors='black',
+            alpha=0.95
         )
         
         # Enable proper depth sorting
@@ -807,7 +820,9 @@ def plot_thick_triangle(ax1, ax2, r):
         ax.set_axis_off()
         ax.set_box_aspect([1,1,1])
         
-        limit = size * 1.3  # Increased limit to accommodate larger shape (was 1.2)
+        # Make the shape appear larger by significantly reducing the axis limits
+        # This effectively zooms in on the shape
+        limit = size * 0.7  # Much smaller limit to zoom in on the shape
         ax.set_xlim(-limit, limit)
         ax.set_ylim(-limit, limit)
         ax.set_zlim(-limit, limit)
