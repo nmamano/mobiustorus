@@ -52,19 +52,290 @@ def gcd(a, b):
         return a
     return gcd(b, a % b)
 
-def plot_normal_torus(ax1, ax2, R, r):
-    # Generate a normal (circular) torus
+# Generalized function to create a torus from any cross-section
+def create_torus(ax1, ax2, R, r, cross_section_func, twist_func=None, colors=None, title="Custom Torus", additional_info=None):
+    """
+    Creates a torus with a custom cross-section and optional twisting.
+    
+    Parameters:
+    - ax1, ax2: The two axes to plot on (front and back views)
+    - R: Major radius of the torus
+    - r: Scale factor for the cross-section
+    - cross_section_func: Function that takes angle v and returns (x,y) coordinates of cross-section
+    - twist_func: Optional function that takes angle u and returns rotation angle
+    - colors: Color or list of colors for the surfaces
+    - title: Title for the plot
+    - additional_info: Optional text to add below the title
+    
+    Returns:
+    - Dictionary containing the x, y, z coordinates and other data for later use if needed
+    """
+    # Generate parametric coordinates
     u = np.linspace(0, 2*np.pi, 100)
     v = np.linspace(0, 2*np.pi, 100)
     u, v = np.meshgrid(u, v)
     
-    x = (R + r * np.cos(v)) * np.cos(u)
-    y = (R + r * np.cos(v)) * np.sin(u)
-    z = r * np.sin(v)
+    # Handle multiple components if the cross-section function returns them
+    if hasattr(cross_section_func, 'is_multi_component') and cross_section_func.is_multi_component:
+        components = cross_section_func(u, v, R, r)
+        
+        # Plot all components on both axes
+        for ax in [ax1, ax2]:
+            for idx, component in enumerate(components):
+                color = colors[idx] if isinstance(colors, list) and idx < len(colors) else 'lightblue'
+                alpha = 0.9 if not isinstance(color, dict) else color.get('alpha', 0.9)
+                c = color if not isinstance(color, dict) else color.get('color', 'lightblue')
+                
+                ax.plot_surface(
+                    component['x'], component['y'], component['z'],
+                    color=c, alpha=alpha
+                )
+                
+            # Standard view setup
+            ax.set_axis_off()
+            ax.set_box_aspect([1,1,1])
+            
+            # Calculate limit based on maximum extent
+            max_x = max(np.max(np.abs(comp['x'])) for comp in components)
+            max_y = max(np.max(np.abs(comp['y'])) for comp in components)
+            max_z = max(np.max(np.abs(comp['z'])) for comp in components)
+            limit = max(max_x, max_y, max_z) * 1.2
+            
+            ax.set_xlim(-limit, limit)
+            ax.set_ylim(-limit, limit)
+            ax.set_zlim(-limit, limit)
+    else:
+        # Create cross-section coordinates
+        cross_x = np.zeros_like(v)
+        cross_y = np.zeros_like(v)
+        
+        # Apply cross-section function with optional rotation
+        for i in range(v.shape[0]):
+            for j in range(v.shape[1]):
+                if twist_func:
+                    # Get rotation angle from twist function
+                    rotation = twist_func(u[i,j])
+                    
+                    # Get base cross-section coordinates
+                    base_x, base_y = cross_section_func(v[i,j])
+                    
+                    # Apply rotation
+                    cos_rot = np.cos(rotation)
+                    sin_rot = np.sin(rotation)
+                    cross_x[i,j] = base_x * cos_rot - base_y * sin_rot
+                    cross_y[i,j] = base_x * sin_rot + base_y * cos_rot
+                else:
+                    # No rotation, just get coordinates
+                    cross_x[i,j], cross_y[i,j] = cross_section_func(v[i,j])
+        
+        # Generate the torus
+        x = (R + cross_x) * np.cos(u)
+        y = (R + cross_x) * np.sin(u)
+        z = cross_y
+        
+        # Handle special case for polygon torus with face colors
+        if hasattr(cross_section_func, 'has_face_colors') and cross_section_func.has_face_colors:
+            face_colors = cross_section_func.get_face_colors(u, v)
+            
+            # Plot on both axes
+            for ax in [ax1, ax2]:
+                surface = ax.plot_surface(x, y, z, facecolors=face_colors, alpha=0.9)
+                ax.set_axis_off()
+                ax.set_box_aspect([1,1,1])
+                
+                limit = (R + np.max(np.abs(cross_x))) * 1.2
+                ax.set_xlim(-limit, limit)
+                ax.set_ylim(-limit, limit)
+                ax.set_zlim(-limit, limit)
+        else:
+            # Regular single-color surface
+            color = colors if colors else 'lightblue'
+            
+            # Plot on both axes
+            for ax in [ax1, ax2]:
+                surface = ax.plot_surface(x, y, z, color=color, alpha=0.9)
+                ax.set_axis_off()
+                ax.set_box_aspect([1,1,1])
+                
+                limit = (R + np.max(np.abs(cross_x))) * 1.2
+                ax.set_xlim(-limit, limit)
+                ax.set_ylim(-limit, limit)
+                ax.set_zlim(-limit, limit)
+    
+    # Set initial viewing angles
+    ax1.view_init(elev=20, azim=45)  # front view
+    ax2.view_init(elev=-20, azim=225)  # back view
+    
+    # Create title with optional additional info
+    full_title = f'{title}\nClick and drag to rotate!'
+    if additional_info:
+        full_title += f'\n{additional_info}'
+        
+    fig.suptitle(full_title, y=0.95)
+    fig.canvas.draw_idle()
+    
+    # Return generated data for potential reuse
+    if 'x' in locals():
+        return {'x': x, 'y': y, 'z': z, 'cross_x': cross_x, 'cross_y': cross_y}
+    else:
+        return components
+
+def plot_normal_torus(ax1, ax2, R, r):
+    """Generate a normal (circular) torus"""
+    def circle_cross_section(angle):
+        return r * np.cos(angle), r * np.sin(angle)
+    
+    create_torus(ax1, ax2, R, r, circle_cross_section, 
+                 colors='lightblue', 
+                 title="Normal Torus")
+
+def plot_double_torus(ax1, ax2, R, r):
+    """Generate a torus with a doughnut cross-section (double torus)"""
+    # Parameters for the double torus
+    r_outer = r  # Outer radius of the cross-section
+    r_inner = r/2  # Inner radius of the cross-section
+    
+    def double_torus_components(u, v, R, r):
+        # This function returns multiple components for the double torus
+        # Outer torus
+        x_outer = (R + r_outer * np.cos(v)) * np.cos(u)
+        y_outer = (R + r_outer * np.cos(v)) * np.sin(u)
+        z_outer = r_outer * np.sin(v)
+        
+        # Inner torus (smaller doughnut inside the cross-section)
+        x_inner = (R + r_inner * np.cos(v + np.pi)) * np.cos(u)
+        y_inner = (R + r_inner * np.cos(v + np.pi)) * np.sin(u)
+        z_inner = r_inner * np.sin(v + np.pi)
+        
+        return [
+            {'x': x_outer, 'y': y_outer, 'z': z_outer},
+            {'x': x_inner, 'y': y_inner, 'z': z_inner}
+        ]
+    
+    # Mark the function as multi-component
+    double_torus_components.is_multi_component = True
+    
+    create_torus(
+        ax1, ax2, R, r, 
+        double_torus_components, 
+        colors=[{'color': 'lightblue', 'alpha': 0.6}, {'color': 'coral', 'alpha': 0.9}],
+        title="Double Torus (Torus with Doughnut Cross-section)"
+    )
+
+def plot_pointy_torus(ax1, ax2, R, r):
+    """Generate a torus with a cross-section that's a circle with one sharp corner"""
+    # Parameters
+    circle_radius = r * 0.7  # Radius of the inscribed circle
+    point_scale = 0.7  # Scale factor to move the point closer to center
+    
+    def pointy_cross_section(angle):
+        # Start with a circle
+        x = circle_radius * np.cos(angle)
+        y = circle_radius * np.sin(angle)
+        
+        # Check if we're in the top-right quadrant (for the sharp corner)
+        if x > 0 and y > 0:
+            # Make a sharp corner in the top-right quadrant
+            return r * point_scale, r * point_scale
+        
+        # For other quadrants, keep the circle shape
+        return x, y
+    
+    create_torus(ax1, ax2, R, r, pointy_cross_section, 
+                 colors='lightgreen',
+                 title="Pointy Torus (One Sharp Corner)")
+
+def plot_twisted_pointy_torus(ax1, ax2, R, r):
+    """Generate a torus with a cross-section that's a circle with one sharp corner that rotates"""
+    # Parameters
+    circle_radius = r * 0.7  # Radius of the inscribed circle
+    point_scale = 0.7  # Scale factor to move the point closer to center
+    
+    def pointy_cross_section(angle):
+        # Start with a circle
+        x = circle_radius * np.cos(angle)
+        y = circle_radius * np.sin(angle)
+        
+        # Check if we're in the top-right quadrant (for the sharp corner)
+        if x > 0 and y > 0:
+            # Make a sharp corner in the top-right quadrant
+            return r * point_scale, r * point_scale
+        
+        # For other quadrants, keep the circle shape
+        return x, y
+    
+    def linear_twist(u_angle):
+        return u_angle  # Full rotation as we go around the torus
+    
+    create_torus(ax1, ax2, R, r, pointy_cross_section, linear_twist,
+                 colors='lightgreen',
+                 title="Pointy Torus (Rotating Sharp Corner)")
+
+def plot_polygon_torus(ax1, ax2, R, r, k, twist_multiplier, points_per_side):
+    """Generate a torus with a polygonal cross-section with optional twist"""
+    # Calculate the base twist angle
+    base_twist = 2 * np.pi / k
+    total_twist = base_twist * twist_multiplier
+    
+    # Calculate the greatest common divisor between k and twist_multiplier
+    # If twist_multiplier is 0, use k as the number of colors
+    num_colors = gcd(k, twist_multiplier) if twist_multiplier > 0 else k
+    
+    # Generate colors for each face based on GCD
+    colors = plt.cm.rainbow(np.linspace(0, 1, num_colors))
+    
+    # Generate vertices of the regular polygon
+    angles = np.linspace(0, 2*np.pi, k+1)
+    # For k=4, rotate the polygon by 45 degrees (π/4 radians)
+    rotation_offset = np.pi/4 if k == 4 else 0
+    vertices_x = r * np.cos(angles + rotation_offset)
+    vertices_y = r * np.sin(angles + rotation_offset)
+    
+    # Create points between vertices
+    polygon_x = []
+    polygon_y = []
+    face_colors = []
+    
+    for i in range(k):
+        x1, y1 = vertices_x[i], vertices_y[i]
+        x2, y2 = vertices_x[i+1], vertices_y[i+1]
+        
+        t = np.linspace(0, 1, points_per_side)
+        polygon_x.extend(x1 + (x2 - x1) * t)
+        polygon_y.extend(y1 + (y2 - y1) * t)
+        
+        # Assign color based on modulo of GCD
+        color_index = i % num_colors
+        face_colors.extend([colors[color_index]] * points_per_side)
+    
+    polygon_x = np.array(polygon_x)
+    polygon_y = np.array(polygon_y)
+    face_colors = np.array(face_colors)
+    
+    # Create the meshgrid
+    theta = np.linspace(0, 2*np.pi, 100)
+    theta_grid, t_grid = np.meshgrid(theta, np.arange(len(polygon_x)))
+    
+    # Apply twist
+    twist_angle = total_twist * theta_grid / (2*np.pi)
+    
+    # Rotate the polygon coordinates
+    rotated_x = polygon_x[t_grid.astype(int)] * np.cos(twist_angle) - polygon_y[t_grid.astype(int)] * np.sin(twist_angle)
+    rotated_y = polygon_x[t_grid.astype(int)] * np.sin(twist_angle) + polygon_y[t_grid.astype(int)] * np.cos(twist_angle)
+    
+    # Generate coordinates
+    x = (R + rotated_x) * np.cos(theta_grid)
+    y = (R + rotated_x) * np.sin(theta_grid)
+    z = rotated_y
+    
+    # Create color array for the entire surface
+    colors_2d = np.zeros((x.shape[0], x.shape[1], 4))
+    for i in range(x.shape[0]):
+        colors_2d[i, :] = face_colors[i]
     
     # Plot on both axes
     for ax in [ax1, ax2]:
-        surface = ax.plot_surface(x, y, z, color='lightblue', alpha=0.9)
+        surface = ax.plot_surface(x, y, z, facecolors=colors_2d, alpha=0.9)
         ax.set_axis_off()
         ax.set_box_aspect([1,1,1])
         
@@ -77,181 +348,14 @@ def plot_normal_torus(ax1, ax2, R, r):
     ax1.view_init(elev=20, azim=45)  # front view
     ax2.view_init(elev=-20, azim=225)  # back view
     
-    fig.suptitle('Normal Torus\nClick and drag to rotate!', y=0.95)
-    fig.canvas.draw_idle()
-
-def plot_double_torus(ax1, ax2, R, r):
-    # Generate a torus with a doughnut cross-section (double torus)
-    u = np.linspace(0, 2*np.pi, 100)
-    v = np.linspace(0, 2*np.pi, 100)
-    u, v = np.meshgrid(u, v)
+    if twist_multiplier == 0:
+        twist_text = ""
+    else:
+        twist_text = f" with {twist_multiplier} face{'s' if twist_multiplier > 1 else ''} twist"
     
-    # Parameters for the double torus
-    R_main = R  # Main torus radius
-    r_outer = r  # Outer radius of the cross-section
-    r_inner = r/2  # Inner radius of the cross-section
-    
-    # Outer torus
-    x_outer = (R_main + r_outer * np.cos(v)) * np.cos(u)
-    y_outer = (R_main + r_outer * np.cos(v)) * np.sin(u)
-    z_outer = r_outer * np.sin(v)
-    
-    # Inner torus (smaller doughnut inside the cross-section)
-    # We create a smaller torus within the cross-section
-    x_inner = (R_main + r_inner * np.cos(v + np.pi)) * np.cos(u)
-    y_inner = (R_main + r_inner * np.cos(v + np.pi)) * np.sin(u)
-    z_inner = r_inner * np.sin(v + np.pi)
-    
-    # Plot on both axes
-    for ax in [ax1, ax2]:
-        # Plot outer torus with transparency
-        outer_surface = ax.plot_surface(x_outer, y_outer, z_outer, color='lightblue', alpha=0.6)
-        # Plot inner torus
-        inner_surface = ax.plot_surface(x_inner, y_inner, z_inner, color='coral', alpha=0.9)
-        
-        ax.set_axis_off()
-        ax.set_box_aspect([1,1,1])
-        
-        limit = (R_main + r_outer) * 1.2
-        ax.set_xlim(-limit, limit)
-        ax.set_ylim(-limit, limit)
-        ax.set_zlim(-limit, limit)
-    
-    # Set initial viewing angles
-    ax1.view_init(elev=20, azim=45)  # front view
-    ax2.view_init(elev=-20, azim=225)  # back view
-    
-    fig.suptitle('Double Torus (Torus with Doughnut Cross-section)\nClick and drag to rotate!', y=0.95)
-    fig.canvas.draw_idle()
-
-def plot_pointy_torus(ax1, ax2, R, r):
-    # Generate a torus with a cross-section that's a circle inscribed in a square
-    # with one corner of the square still sharp
-    u = np.linspace(0, 2*np.pi, 100)
-    v = np.linspace(0, 2*np.pi, 100)
-    u, v = np.meshgrid(u, v)
-    
-    # Parameters
-    square_size = r  # Size of the square
-    circle_radius = r * 0.7  # Radius of the inscribed circle
-    point_scale = 0.7  # Scale factor to move the point closer to center (0.7 matches the cylinder)
-    
-    # Function to create the special cross-section
-    def cross_section(angle):
-        # Start with a circle
-        x = circle_radius * np.cos(angle)
-        y = circle_radius * np.sin(angle)
-        
-        # Check if we're in the top-right quadrant (for the sharp corner)
-        if x > 0 and y > 0:
-            # Make a sharp corner in the top-right quadrant, but closer to center
-            return square_size * point_scale, square_size * point_scale
-        
-        # For other quadrants, keep the circle shape
-        return x, y
-    
-    # Apply the cross-section function to each angle
-    cross_x = np.zeros_like(v)
-    cross_y = np.zeros_like(v)
-    
-    for i in range(v.shape[0]):
-        for j in range(v.shape[1]):
-            cross_x[i,j], cross_y[i,j] = cross_section(v[i,j])
-    
-    # Generate the torus
-    x = (R + cross_x) * np.cos(u)
-    y = (R + cross_x) * np.sin(u)
-    z = cross_y
-    
-    # Plot on both axes
-    for ax in [ax1, ax2]:
-        surface = ax.plot_surface(x, y, z, color='lightgreen', alpha=0.9)
-        ax.set_axis_off()
-        ax.set_box_aspect([1,1,1])
-        
-        limit = (R + square_size) * 1.2
-        ax.set_xlim(-limit, limit)
-        ax.set_ylim(-limit, limit)
-        ax.set_zlim(-limit, limit)
-    
-    # Set initial viewing angles
-    ax1.view_init(elev=20, azim=45)  # front view
-    ax2.view_init(elev=-20, azim=225)  # back view
-    
-    fig.suptitle('Pointy Torus (One Sharp Corner)\nClick and drag to rotate!', y=0.95)
-    fig.canvas.draw_idle()
-
-def plot_twisted_pointy_torus(ax1, ax2, R, r):
-    # Generate a torus with a cross-section that's a circle inscribed in a square
-    # with one corner of the square still sharp
-    u = np.linspace(0, 2*np.pi, 100)
-    v = np.linspace(0, 2*np.pi, 100)
-    u, v = np.meshgrid(u, v)
-   
-    # Parameters
-    square_size = r  # Size of the square
-    circle_radius = r * 0.7  # Radius of the inscribed circle
-    point_scale = 0.7  # Scale factor to move the point closer to center (0.7 matches the cylinder)
-   
-    # Function to create the special cross-section
-    def cross_section(angle, rotation):
-        # Start with a circle
-        x = circle_radius * np.cos(angle)
-        y = circle_radius * np.sin(angle)
-       
-        # Apply rotation to the angle to determine which quadrant gets the sharp corner
-        rotated_angle = angle + rotation
-        rotated_x = circle_radius * np.cos(rotated_angle)
-        rotated_y = circle_radius * np.sin(rotated_angle)
-       
-        # Check if we're in the top-right quadrant after rotation (for the sharp corner)
-        if rotated_x > 0 and rotated_y > 0:
-            # Calculate the sharp corner position
-            sharp_x = square_size * point_scale
-            sharp_y = square_size * point_scale
-           
-            # Rotate the sharp corner back to the original coordinate system
-            cos_rot = np.cos(-rotation)
-            sin_rot = np.sin(-rotation)
-            final_x = sharp_x * cos_rot - sharp_y * sin_rot
-            final_y = sharp_x * sin_rot + sharp_y * cos_rot
-           
-            return final_x, final_y
-       
-        # For other quadrants, keep the circle shape
-        return x, y
-   
-    # Apply the cross-section function to each angle
-    cross_x = np.zeros_like(v)
-    cross_y = np.zeros_like(v)
-   
-    for i in range(v.shape[0]):
-        for j in range(v.shape[1]):
-            # Make the cross-section rotate as we go around the torus
-            # u[i,j] ranges from 0 to 2π, so we use it as the rotation angle
-            cross_x[i,j], cross_y[i,j] = cross_section(v[i,j], u[i,j])
-   
-    # Generate the torus
-    x = (R + cross_x) * np.cos(u)
-    y = (R + cross_x) * np.sin(u)
-    z = cross_y
-   
-    # Plot on both axes
-    for ax in [ax1, ax2]:
-        surface = ax.plot_surface(x, y, z, color='lightgreen', alpha=0.9)
-        ax.set_axis_off()
-        ax.set_box_aspect([1,1,1])
-       
-        limit = (R + square_size) * 1.2
-        ax.set_xlim(-limit, limit)
-        ax.set_ylim(-limit, limit)
-        ax.set_zlim(-limit, limit)
-   
-    # Set initial viewing angles
-    ax1.view_init(elev=20, azim=45)  # front view
-    ax2.view_init(elev=-20, azim=225)  # back view
-   
-    fig.suptitle('Pointy Torus (Rotating Sharp Corner)\nClick and drag to rotate!', y=0.95)
+    # Add GCD information to the title
+    gcd_text = f"GCD({k}, {twist_multiplier}) = {num_colors} colors" if twist_multiplier > 0 else f"{k} colors"
+    fig.suptitle(f'Torus with {k}-sided cross-section{twist_text}\n{gcd_text}\nClick and drag to rotate!', y=0.95)
     fig.canvas.draw_idle()
 
 def plot_cube(ax1, ax2, r):
@@ -405,92 +509,6 @@ def plot_pointy_cylinder(ax1, ax2, R, r):
     ax2.view_init(elev=-20, azim=225)  # back view
     
     fig.suptitle('Pointy Cylinder\nClick and drag to rotate!', y=0.95)
-    fig.canvas.draw_idle()
-
-def plot_polygon_torus(ax1, ax2, R, r, k, twist_multiplier, points_per_side):
-    # Calculate the base twist angle
-    base_twist = 2 * np.pi / k
-    total_twist = base_twist * twist_multiplier
-    
-    # Generate vertices of the regular polygon
-    angles = np.linspace(0, 2*np.pi, k+1)
-    # For k=4, rotate the polygon by 45 degrees (π/4 radians)
-    rotation_offset = np.pi/4 if k == 4 else 0
-    vertices_x = r * np.cos(angles + rotation_offset)
-    vertices_y = r * np.sin(angles + rotation_offset)
-
-    # Create points between vertices
-    polygon_x = []
-    polygon_y = []
-    face_colors = []
-    
-    # Calculate the greatest common divisor between k and twist_multiplier
-    # If twist_multiplier is 0, use k as the number of colors
-    num_colors = gcd(k, twist_multiplier) if twist_multiplier > 0 else k
-    
-    # Generate different colors for each face based on GCD
-    colors = plt.cm.rainbow(np.linspace(0, 1, num_colors))
-
-    for i in range(k):
-        x1, y1 = vertices_x[i], vertices_y[i]
-        x2, y2 = vertices_x[i+1], vertices_y[i+1]
-        
-        t = np.linspace(0, 1, points_per_side)
-        polygon_x.extend(x1 + (x2 - x1) * t)
-        polygon_y.extend(y1 + (y2 - y1) * t)
-        
-        # Assign color based on modulo of GCD
-        color_index = i % num_colors
-        face_colors.extend([colors[color_index]] * points_per_side)
-
-    polygon_x = np.array(polygon_x)
-    polygon_y = np.array(polygon_y)
-    face_colors = np.array(face_colors)
-
-    # Create the meshgrid
-    theta = np.linspace(0, 2*np.pi, 100)
-    theta_grid, t_grid = np.meshgrid(theta, np.arange(len(polygon_x)))
-
-    # Apply twist
-    twist_angle = total_twist * theta_grid / (2*np.pi)
-    
-    # Rotate the polygon coordinates
-    rotated_x = polygon_x[t_grid.astype(int)] * np.cos(twist_angle) - polygon_y[t_grid.astype(int)] * np.sin(twist_angle)
-    rotated_y = polygon_x[t_grid.astype(int)] * np.sin(twist_angle) + polygon_y[t_grid.astype(int)] * np.cos(twist_angle)
-
-    # Generate coordinates
-    x = (R + rotated_x) * np.cos(theta_grid)
-    y = (R + rotated_x) * np.sin(theta_grid)
-    z = rotated_y
-
-    # Create color array for the entire surface
-    colors_2d = np.zeros((x.shape[0], x.shape[1], 4))
-    for i in range(x.shape[0]):
-        colors_2d[i, :] = face_colors[i]
-
-    # Plot on both axes
-    for ax in [ax1, ax2]:
-        surface = ax.plot_surface(x, y, z, facecolors=colors_2d, alpha=0.9)
-        ax.set_axis_off()
-        ax.set_box_aspect([1,1,1])
-        
-        limit = (R + r) * 1.2
-        ax.set_xlim(-limit, limit)
-        ax.set_ylim(-limit, limit)
-        ax.set_zlim(-limit, limit)
-    
-    # Set initial viewing angles
-    ax1.view_init(elev=20, azim=45)  # front view
-    ax2.view_init(elev=-20, azim=225)  # back view (note the negative elevation)
-    
-    if twist_multiplier == 0:
-        twist_text = ""
-    else:
-        twist_text = f" with {twist_multiplier} face{'s' if twist_multiplier > 1 else ''} twist"
-    
-    # Add GCD information to the title
-    gcd_text = f"\nGCD({k}, {twist_multiplier}) = {num_colors} colors" if twist_multiplier > 0 else f"\n{k} colors"
-    fig.suptitle(f'Torus with {k}-sided cross-section{twist_text}{gcd_text}\nClick and drag to rotate!', y=0.95)
     fig.canvas.draw_idle()
 
 def plot_octahedron(ax1, ax2, r):
