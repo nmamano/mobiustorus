@@ -2,6 +2,32 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, RadioButtons
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+import os
+import sys
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+import threading
+
+# File monitoring setup
+# This code sets up automatic program termination when the source file is modified.
+# It's useful during development to ensure the program restarts with the latest code changes.
+# When the script is modified and saved, the program will detect the change and exit,
+# allowing a new instance to be started with the updated code.
+class FileChangeHandler(FileSystemEventHandler):
+    def on_modified(self, event):
+        if event.src_path == os.path.abspath(__file__):
+            print("\nFile changed. Closing the program...")
+            os._exit(0)
+
+def start_file_monitoring():
+    event_handler = FileChangeHandler()
+    observer = Observer()
+    observer.schedule(event_handler, path=os.path.dirname(os.path.abspath(__file__)), recursive=False)
+    observer.start()
+    
+# Start file monitoring in a separate thread 
+monitoring_thread = threading.Thread(target=start_file_monitoring, daemon=True)
+monitoring_thread.start()
 
 # Custom rotation handler to link both views
 def on_mouse_move(event):
@@ -857,10 +883,107 @@ def plot_thick_triangle(ax1, ax2, r):
     
     fig.canvas.draw_idle()
 
-def plot_edged_torus(ax1, ax2, R, r):
-    pass
+def plot_edged_torus(ax1, ax2, R, r, inner_hole_size=0.05):
+    """
+    Generate a lenticular torus with different colors for top and bottom halves
+    
+    Parameters:
+    - ax1, ax2: The two axes to plot on (front and back views)
+    - R: Major radius of the torus
+    - r: Scale factor for the cross-section
+    - inner_hole_size: Controls the size of the inner hole (0.1 = small hole, 1.0 = large hole)
+    """
+    
+    def lenticular_cross_section(angle):
+        # Create a lens shape with sharp points at inner and outer edges
+        # Sharpen the edges by using a power function
+        EDGE_SHARPNESS = 0.0000099  # Lower = sharper points
+        
+        # Calculate base coordinates for a circle
+        base_x = np.cos(angle)
+        base_y = np.sin(angle)
+        
+        # Create lens shape with sharp points
+        x = base_x
+        # Make the outer part more round by reducing the sharpness effect for the outer half
+        OUTER_HALF_START = -np.pi/2
+        OUTER_HALF_END = np.pi/2
+        if OUTER_HALF_START < angle < OUTER_HALF_END:  # Outer half
+            # Use a milder sharpness for the outer part to make it more round
+            OUTER_SHARPNESS = 0.3  # Higher value = more round
+            y = base_y * np.abs(np.sin(angle)) ** OUTER_SHARPNESS
+        else:
+            # Keep the inner part sharp
+            y = base_y * np.abs(np.sin(angle)) ** EDGE_SHARPNESS
+        
+        # Make the inner edge reach toward the center
+        INNER_HALF_START = np.pi/2
+        INNER_HALF_END = 3*np.pi/2
+        if INNER_HALF_START < angle < INNER_HALF_END:  # Inner half
+            # Scale x to reach toward the center
+            MIN_INNER_SCALE = 0.1  # Reduced minimum scale factor for sharper inner edge
+            MAX_INNER_SCALE = 0.7  # Additional scale factor based on angle
+            # Use a higher exponent for sharper inner edge
+            INNER_SHARPNESS = 0.00001  # Lower value = sharper inner edge
+            x = x * (MIN_INNER_SCALE + MAX_INNER_SCALE * np.abs(np.sin(angle)) ** INNER_SHARPNESS)
+        
+        # Make the cross-section wider to reduce the inner hole size
+        # Scale the x coordinate based on the inner_hole_size parameter
+        if angle > INNER_HALF_START and angle < INNER_HALF_END:
+            # For the inner part, make it reach further inward
+            x = x * (2.0 - inner_hole_size)  # Larger value = smaller hole
+        else:
+            # For the outer part, make it wider
+            x = x * inner_hole_size  # Smaller value = wider outer edge
+        
+        return r * x, r * y
+    
+    # Generate parametric coordinates
+    u = np.linspace(0, 2*np.pi, 100)
+    v = np.linspace(0, 2*np.pi, 100)
+    u, v = np.meshgrid(u, v)
+    
+    # Create cross-section coordinates
+    cross_x = np.zeros_like(v)
+    cross_y = np.zeros_like(v)
+    
+    # Apply cross-section function
+    for i in range(v.shape[0]):
+        for j in range(v.shape[1]):
+            cross_x[i,j], cross_y[i,j] = lenticular_cross_section(v[i,j])
+    
+    # Generate the torus
+    x = (R + cross_x) * np.cos(u)
+    y = (R + cross_x) * np.sin(u)
+    z = cross_y
+    
+    # Create color array based on z-coordinate
+    colors = np.zeros((*z.shape, 4))  # RGBA array
+    colors[z >= 0] = np.array([0.8, 0.9, 1.0, 0.9])  # lightblue with alpha
+    colors[z < 0] = np.array([1.0, 0.5, 0.4, 0.9])   # coral with alpha
+    
+    # Plot on both axes
+    for ax in [ax1, ax2]:
+        surface = ax.plot_surface(x, y, z, facecolors=colors)
+        ax.set_axis_off()
+        ax.set_box_aspect([1,1,1])
+        
+        PLOT_MARGIN = 1.2  # Extra space around the shape (20% margin)
+        MAX_CROSS_SECTION_SCALE = 2.0  # Maximum scale factor for the outer part
+        limit = (R + r * (MAX_CROSS_SECTION_SCALE - inner_hole_size)) * PLOT_MARGIN  # Adjust limit based on the wider cross-section
+        ax.set_xlim(-limit, limit)
+        ax.set_ylim(-limit, limit)
+        ax.set_zlim(-limit, limit)
+    
+    # Set initial viewing angles
+    ax1.view_init(elev=20, azim=45)  # front view
+    ax2.view_init(elev=-20, azim=225)  # back view
+    
+    fig.suptitle('Edged Torus\nClick and drag to rotate!', y=0.95)
+    fig.text(0.5, 0.01, f'Upper half: lightblue, Lower half: coral\nInner hole size: {inner_hole_size:.1f}', 
+             ha='center', fontsize=9)
+    fig.canvas.draw_idle()
 
-# Function to update the plot when parameters change
 def update(val):
     k = int(k_slider.val)
     twist_multiplier = int(twist_slider.val)

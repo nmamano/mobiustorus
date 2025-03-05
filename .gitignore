@@ -1,1 +1,8 @@
 cube_diagram.pdf.autosave.ipe
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+
