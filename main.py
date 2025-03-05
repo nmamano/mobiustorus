@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Slider, RadioButtons
+from matplotlib.widgets import Slider, RadioButtons, Button
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import os
 import sys
@@ -9,6 +9,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import threading
 import json
+from matplotlib.animation import FuncAnimation
 
 # Import all shape plotting functions
 from normal_torus import plot_normal_torus
@@ -121,6 +122,7 @@ def on_button_press(event):
 def on_button_release(event):
     if event.inaxes in [ax1, ax2]:
         event.inaxes._mouse_init = None
+
 def update(val):
     k = int(k_slider.val)
     twist_multiplier = int(twist_slider.val)
@@ -209,6 +211,36 @@ def on_shape_select(label):
     fig.canvas.draw_idle()
     update(None)
 
+# Add these variables before creating the figure
+rotation_active = True
+anim = None
+time_counter = 0  # Add this to track time for smooth oscillation
+
+def rotate(frame):
+    if not rotation_active:
+        return
+    
+    global time_counter
+    time_counter += 1
+    
+    # Rotate both views laterally (constant speed)
+    ax1.azim = (ax1.azim + 1) % 360
+    ax2.azim = (ax2.azim + 1) % 360
+    
+    # Smooth sinusoidal vertical motion
+    # Using sin function to oscillate between -45 and 45 degrees
+    elevation = 45 * np.sin(time_counter * 0.02)  # 0.02 controls speed
+    ax1.elev = elevation
+    ax2.elev = -elevation  # Keep the back view mirrored
+    
+    fig.canvas.draw_idle()
+
+def toggle_rotation(event):
+    global rotation_active
+    rotation_active = not rotation_active
+    rotation_button.label.set_text('Start Rotation' if not rotation_active else 'Stop Rotation')
+    plt.draw()
+
 # Create figure with two subplots and space for sliders and controls
 fig = plt.figure(figsize=(10, 7))  # Increased figure height
 
@@ -276,7 +308,15 @@ fig.canvas.mpl_connect('motion_notify_event', on_mouse_move)
 fig.canvas.mpl_connect('button_press_event', on_button_press)
 fig.canvas.mpl_connect('button_release_event', on_button_release)
 
+# Add this after creating the shape selector but before the initial plot
+rotation_button_ax = plt.axes([0.02, 0.22, 0.20, 0.04])  # Position above shape selector
+rotation_button = Button(rotation_button_ax, 'Stop Rotation')
+rotation_button.on_clicked(toggle_rotation)
+
 # Initial plot
 update(4)
+
+# Add this right before plt.show()
+anim = FuncAnimation(fig, rotate, interval=50)  # 50ms interval = 20fps
 
 plt.show()
