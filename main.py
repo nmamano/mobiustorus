@@ -1160,6 +1160,12 @@ shape_selector = RadioButtons(
     active=shape_options.index(last_shape)  # Set active based on last selected shape.
 )
 
+# Set initial visibility of sliders based on last selected shape
+k_slider_ax.set_visible(last_shape == 'Polygon Torus')
+twist_slider_ax.set_visible(last_shape == 'Polygon Torus')
+k_slider.set_active(last_shape == 'Polygon Torus')
+twist_slider.set_active(last_shape == 'Polygon Torus')
+
 # Connect the callback to the radio buttons
 shape_selector.on_clicked(on_shape_select)
 
