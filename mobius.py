@@ -4,19 +4,22 @@ from matplotlib.widgets import Slider, RadioButtons
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import os
 import sys
+import subprocess
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import threading
 
 # File monitoring setup
-# This code sets up automatic program termination when the source file is modified.
+# This code sets up automatic program termination and restart when the source file is modified.
 # It's useful during development to ensure the program restarts with the latest code changes.
-# When the script is modified and saved, the program will detect the change and exit,
-# allowing a new instance to be started with the updated code.
+# When the script is modified and saved, the program will detect the change, exit,
+# and automatically start a new instance with the updated code.
 class FileChangeHandler(FileSystemEventHandler):
     def on_modified(self, event):
         if event.src_path == os.path.abspath(__file__):
-            print("\nFile changed. Closing the program...")
+            print("\nFile changed. Restarting the program...")
+            # Start new process before exiting
+            subprocess.Popen([sys.executable, __file__])
             os._exit(0)
 
 def start_file_monitoring():
@@ -25,7 +28,7 @@ def start_file_monitoring():
     observer.schedule(event_handler, path=os.path.dirname(os.path.abspath(__file__)), recursive=False)
     observer.start()
     
-# Start file monitoring in a separate thread 
+# Start file monitoring in a separate thread
 monitoring_thread = threading.Thread(target=start_file_monitoring, daemon=True)
 monitoring_thread.start()
 
@@ -883,7 +886,7 @@ def plot_thick_triangle(ax1, ax2, r):
     
     fig.canvas.draw_idle()
 
-def plot_edged_torus(ax1, ax2, R, r, inner_hole_size=0.05):
+def plot_edged_torus(ax1, ax2, R, r):
     """
     Generate a lenticular torus with different colors for top and bottom halves
     
@@ -893,6 +896,7 @@ def plot_edged_torus(ax1, ax2, R, r, inner_hole_size=0.05):
     - r: Scale factor for the cross-section
     - inner_hole_size: Controls the size of the inner hole (0.1 = small hole, 1.0 = large hole)
     """
+    inner_hole_size=0.05
     
     def lenticular_cross_section(angle):
         # Create a lens shape with sharp points at inner and outer edges
