@@ -10,6 +10,20 @@ from watchdog.events import FileSystemEventHandler
 import threading
 import json
 
+# Import all shape plotting functions
+from normal_torus import plot_normal_torus
+from double_torus import plot_double_torus
+from pointy_torus import plot_pointy_torus
+from twisted_pointy_torus import plot_twisted_pointy_torus
+from polygon_torus import plot_polygon_torus
+from pointy_cylinder import plot_pointy_cylinder
+from cube import plot_cube
+from octahedron import plot_octahedron
+from edged_ball import plot_edged_ball
+from tetrahedron import plot_tetrahedron
+from thick_triangle import plot_thick_triangle
+from edged_torus import plot_edged_torus
+
 # Constants
 SETTINGS_FILE = 'shape_settings.json'
 
