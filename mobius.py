@@ -8,6 +8,35 @@ import subprocess
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import threading
+import json
+
+# Constants
+SETTINGS_FILE = 'shape_settings.json'
+
+# Load last selected shape from file
+def load_last_shape():
+    try:
+        if os.path.exists(SETTINGS_FILE):
+            with open(SETTINGS_FILE, 'r') as f:
+                settings = json.load(f)
+                return settings.get('last_shape', 'Polygon Torus')
+    except:
+        pass
+    return 'Polygon Torus'
+
+# Save selected shape to file
+def save_selected_shape(shape):
+    try:
+        settings = {
+            "_comment": "This is an auto-generated settings file for the Mobius Torus visualization program. DO NOT MODIFY MANUALLY.",
+            "_purpose": "This file stores the last selected shape to persist user preferences between program restarts.",
+            "last_shape": shape,
+            "last_modified": str(np.datetime64('now'))  # Add timestamp for reference
+        }
+        with open(SETTINGS_FILE, 'w') as f:
+            json.dump(settings, f, indent=4)  # Use pretty printing for better readability
+    except:
+        pass
 
 # File monitoring setup
 # This code sets up automatic program termination and restart when the source file is modified.
@@ -16,6 +45,10 @@ import threading
 # and automatically start a new instance with the updated code.
 class FileChangeHandler(FileSystemEventHandler):
     def on_modified(self, event):
+        # Ignore changes to the settings file
+        if event.src_path == os.path.abspath(SETTINGS_FILE):
+            return
+            
         if event.src_path == os.path.abspath(__file__):
             print("\nFile changed. Restarting the program...")
             # Start new process before exiting
@@ -1069,6 +1102,9 @@ def on_shape_select(label):
         k_slider.set_active(False)
         twist_slider.set_active(False)
     
+    # Save the selected shape
+    save_selected_shape(label)
+    
     # Redraw the figure to update visibility
     fig.canvas.draw_idle()
     update(None)
@@ -1109,13 +1145,17 @@ twist_slider = Slider(
     valstep=1
 )
 
+# Get the last selected shape
+last_shape = load_last_shape()
+
 # Replace the shape selector with adjusted position and size
 shape_selector_ax = plt.axes([0.02, 0.02, 0.20, 0.18])  # Increased height, moved to bottom left
+shape_options = ('Polygon Torus', 'Normal Torus', 'Double Torus', 'Pointy Torus', 
+     'Twisted Pointy Torus', 'Pointy Cylinder', 'Cube', 'Octahedron', 'Edged Ball', 'Tetrahedron', 'Thick Triangle', 'Edged Torus')
 shape_selector = RadioButtons(
     shape_selector_ax, 
-    ('Polygon Torus', 'Normal Torus', 'Double Torus', 'Pointy Torus', 
-     'Twisted Pointy Torus', 'Pointy Cylinder', 'Cube', 'Octahedron', 'Edged Ball', 'Tetrahedron', 'Thick Triangle', 'Edged Torus'),
-    active=0  # Default to Polygon Torus
+    shape_options,
+    active=shape_options.index(last_shape)  # Set active based on last selected shape.
 )
 
 # Connect the callback to the radio buttons
