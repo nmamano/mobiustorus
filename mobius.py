@@ -707,11 +707,6 @@ def plot_edged_ball(ax1, ax2, r):
     ax2.view_init(elev=-20, azim=225)  # back view
     
     fig.suptitle('Edged Ball\nClick and drag to rotate!', y=0.95)
-    
-    # Add a text annotation explaining the colors
-    fig.text(0.5, 0.01, 'Upper hemisphere: lightblue, Lower hemisphere: lightgreen', 
-             ha='center', fontsize=9)
-    
     fig.canvas.draw_idle()
 
 def plot_tetrahedron(ax1, ax2, r):
@@ -912,11 +907,6 @@ def plot_thick_triangle(ax1, ax2, r):
     ax2.view_init(elev=-20, azim=225)  # back view
     
     fig.suptitle('Thick Triangle\nClick and drag to rotate!', y=0.95)
-    
-    # Add a description of the faces
-    fig.text(0.5, 0.01, 'Front: blue, Back: green, Left side: coral, Right side: gold', 
-            ha='center', fontsize=9)
-    
     fig.canvas.draw_idle()
 
 def plot_edged_torus(ax1, ax2, R, r):
@@ -1017,8 +1007,6 @@ def plot_edged_torus(ax1, ax2, R, r):
     ax2.view_init(elev=-20, azim=225)  # back view
     
     fig.suptitle('Edged Torus\nClick and drag to rotate!', y=0.95)
-    fig.text(0.5, 0.01, f'Upper half: lightblue, Lower half: coral\nInner hole size: {inner_hole_size:.1f}', 
-             ha='center', fontsize=9)
     fig.canvas.draw_idle()
 
 def update(val):
