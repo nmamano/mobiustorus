@@ -839,6 +839,9 @@ def plot_thick_triangle(ax1, ax2, r):
     
     fig.canvas.draw_idle()
 
+def plot_edged_torus(ax1, ax2, R, r):
+    pass
+
 # Function to update the plot when parameters change
 def update(val):
     k = int(k_slider.val)
@@ -888,6 +891,10 @@ def update(val):
     
     elif selected_shape == 'Thick Triangle':
         plot_thick_triangle(ax1, ax2, r)
+        return
+    
+    elif selected_shape == 'Edged Torus':
+        plot_edged_torus(ax1, ax2, R, r)
         return
 
     plot_polygon_torus(ax1, ax2, R, r, k, twist_multiplier, points_per_side)
@@ -962,7 +969,7 @@ shape_selector_ax = plt.axes([0.02, 0.02, 0.20, 0.18])  # Increased height, move
 shape_selector = RadioButtons(
     shape_selector_ax, 
     ('Polygon Torus', 'Normal Torus', 'Double Torus', 'Pointy Torus', 
-     'Twisted Pointy Torus', 'Pointy Cylinder', 'Cube', 'Octahedron', 'Edged Ball', 'Tetrahedron', 'Thick Triangle'),
+     'Twisted Pointy Torus', 'Pointy Cylinder', 'Cube', 'Octahedron', 'Edged Ball', 'Tetrahedron', 'Thick Triangle', 'Edged Torus'),
     active=0  # Default to Polygon Torus
 )
 
