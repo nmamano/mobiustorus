@@ -281,13 +281,14 @@ twist_slider = Slider(
 last_shape = load_last_shape()
 
 # Replace the shape selector with adjusted position and size
-shape_selector_ax = plt.axes([0.02, 0.02, 0.20, 0.18])  # Increased height, moved to bottom left
+shape_selector_ax = plt.axes([0.02, 0.02, 0.20, 0.25])  # Increased height from 0.18 to 0.25
+
 shape_options = ('Polygon Torus', 'Normal Torus', 'Double Torus', 'Pointy Torus', 
      'Twisted Pointy Torus', 'Pointy Cylinder', 'Cube', 'Octahedron', 'Edged Ball', 'Tetrahedron', 'Thick Triangle', 'Edged Torus')
 shape_selector = RadioButtons(
     shape_selector_ax, 
     shape_options,
-    active=shape_options.index(last_shape)  # Set active based on last selected shape.
+    active=shape_options.index(last_shape)  # Set active based on last selected shape
 )
 
 # Set initial visibility of sliders based on last selected shape
@@ -308,8 +309,8 @@ fig.canvas.mpl_connect('motion_notify_event', on_mouse_move)
 fig.canvas.mpl_connect('button_press_event', on_button_press)
 fig.canvas.mpl_connect('button_release_event', on_button_release)
 
-# Add this after creating the shape selector but before the initial plot
-rotation_button_ax = plt.axes([0.02, 0.22, 0.20, 0.04])  # Position above shape selector
+# Move the rotation button up to accommodate the taller shape selector
+rotation_button_ax = plt.axes([0.02, 0.29, 0.20, 0.04])  # Moved up from 0.22 to 0.29
 rotation_button = Button(rotation_button_ax, 'Stop Rotation')
 rotation_button.on_clicked(toggle_rotation)
 

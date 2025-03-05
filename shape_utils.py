@@ -137,9 +137,10 @@ def create_torus(ax1, ax2, R, r, cross_section_func, twist_func=None, colors=Non
     full_title = f'{title}\nClick and drag to rotate!'
     if additional_info:
         full_title += f'\n{additional_info}'
-        
-    fig.suptitle(full_title, y=0.95)
-    fig.canvas.draw_idle()
+    
+    # Get the figure from one of the axes and set the title
+    plt.gcf().suptitle(full_title, y=0.95)
+    plt.gcf().canvas.draw_idle()
     
     # Return generated data for potential reuse
     if 'x' in locals():
