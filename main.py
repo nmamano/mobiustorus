@@ -322,7 +322,7 @@ def record_animation(event):
                     cropped = frame[height - y_max_px:height - y_min_px, x_min_px:x_max_px]
                     cropped_frames.append(cropped)
                 
-                imageio.mimsave(filename, cropped_frames, fps=20)
+                imageio.mimsave(filename, cropped_frames, fps=20, loop=0)
                 record_button.label.set_text(f'Saved as {filename}')
             except Exception as e:
                 record_button.label.set_text(f'Error: {str(e)}')
