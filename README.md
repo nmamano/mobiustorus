@@ -8,4 +8,4 @@ Built the first version with 'vibe coding'. You can see the exact sequence of pr
 
 ## Other shapes
 
-![Cube Diagram](misc/cube_diagram.png)
+![Cube Diagram](misc/cube-diagram.png)
