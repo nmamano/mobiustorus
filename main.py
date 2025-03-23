@@ -215,12 +215,14 @@ def on_shape_select(label):
 rotation_active = True
 anim = None
 time_counter = 0  # Add this to track time for smooth oscillation
+is_recording = False
+recorded_frames = []
 
 def rotate(frame):
     if not rotation_active:
         return
     
-    global time_counter
+    global time_counter, is_recording, recorded_frames
     time_counter += 1
     
     # Rotate both views laterally (constant speed)
@@ -233,6 +235,13 @@ def rotate(frame):
     ax1.elev = elevation
     ax2.elev = -elevation  # Keep the back view mirrored
     
+    # Capture frame if recording
+    if is_recording:
+        # Create a copy of the figure canvas
+        frame_data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+        frame_data = frame_data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+        recorded_frames.append(frame_data)
+    
     fig.canvas.draw_idle()
 
 def toggle_rotation(event):
@@ -240,6 +249,95 @@ def toggle_rotation(event):
     rotation_active = not rotation_active
     rotation_button.label.set_text('Start Rotation' if not rotation_active else 'Stop Rotation')
     plt.draw()
+
+def record_animation(event):
+    global is_recording, recorded_frames
+    
+    if is_recording:
+        return  # Don't allow starting a new recording while one is in progress
+    
+    import time
+    import imageio
+    from datetime import datetime
+    
+    # Clear any previous frames
+    recorded_frames = []
+    
+    # Update button text
+    record_button.label.set_text('Recording...')
+    plt.draw()
+    
+    # Start recording
+    is_recording = True
+    
+    # Run recording for 10 seconds in a separate thread
+    def recording_thread():
+        global is_recording
+        time.sleep(10)  # Record for 10 seconds
+        is_recording = False
+        
+        # Generate unique filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"animation_{timestamp}.gif"
+        
+        # Save frames as GIF
+        if recorded_frames:
+            record_button.label.set_text('Saving GIF...')
+            plt.draw()
+            try:
+                # Get the position of the two subplots in pixels
+                fig.canvas.draw()
+                extent1 = ax1.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+                extent2 = ax2.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+                
+                # Calculate the bounding box that includes both subplots
+                x_min = min(extent1.x0, extent2.x0)
+                y_min = min(extent1.y0, extent2.y0)
+                x_max = max(extent1.x1, extent2.x1)
+                y_max = max(extent1.y1, extent2.y1)
+                
+                # Add tighter crop margin (reduce the margins by increasing these percentages)
+                margin_x = (x_max - x_min) * 0.05  # 5% margin horizontally
+                margin_y = (y_max - y_min) * 0.10  # 10% margin vertically
+                
+                # Apply the tighter margins
+                x_min = x_min + margin_x
+                y_min = y_min + margin_y
+                x_max = x_max - margin_x
+                y_max = y_max - margin_y
+                
+                # Convert to pixel coordinates
+                dpi = fig.dpi
+                x_min_px = int(x_min * dpi)
+                y_min_px = int(y_min * dpi)
+                x_max_px = int(x_max * dpi)
+                y_max_px = int(y_max * dpi)
+                
+                # Crop each frame to just the subplots with tighter margins
+                cropped_frames = []
+                for frame in recorded_frames:
+                    # The y-axis in the image array is flipped compared to figure coordinates
+                    height = frame.shape[0]
+                    # Crop the frame to include only the subplots
+                    cropped = frame[height - y_max_px:height - y_min_px, x_min_px:x_max_px]
+                    cropped_frames.append(cropped)
+                
+                imageio.mimsave(filename, cropped_frames, fps=20)
+                record_button.label.set_text(f'Saved as {filename}')
+            except Exception as e:
+                record_button.label.set_text(f'Error: {str(e)}')
+        else:
+            record_button.label.set_text('No frames captured')
+        
+        plt.draw()
+        
+        # Reset button text after 3 seconds
+        time.sleep(3)
+        record_button.label.set_text('Record GIF (10s)')
+        plt.draw()
+    
+    # Start recording thread
+    threading.Thread(target=recording_thread, daemon=True).start()
 
 # Create figure with two subplots and space for sliders and controls
 fig = plt.figure(figsize=(10, 7))  # Increased figure height
@@ -313,6 +411,11 @@ fig.canvas.mpl_connect('button_release_event', on_button_release)
 rotation_button_ax = plt.axes([0.02, 0.29, 0.20, 0.04])  # Moved up from 0.22 to 0.29
 rotation_button = Button(rotation_button_ax, 'Stop Rotation')
 rotation_button.on_clicked(toggle_rotation)
+
+# Add recording button
+record_button_ax = plt.axes([0.25, 0.29, 0.20, 0.04])  # Position next to rotation button
+record_button = Button(record_button_ax, 'Record GIF (10s)')
+record_button.on_clicked(record_animation)
 
 # Initial plot
 update(4)
